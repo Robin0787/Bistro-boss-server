@@ -50,77 +50,37 @@ async function run() {
     // checking the requested user is admin or not
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded?.user?.email;
-      const query = {email: email};
+      const query = { email: email };
       const user = await userCollection.findOne(query);
-      if(user?.role !== 'admin'){
-        return res.status(403).send({error: true, message: 'Forbidden access'});
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden access" });
       }
       next();
-    }
+    };
     const userCollection = client.db("All-Foods").collection("users");
     const itemsCollection = client.db("All-Foods").collection("items");
     const reviewsCollection = client.db("All-Foods").collection("reviews");
     const cartCollection = client.db("All-Foods").collection("cart");
-    // Users Related Api
+
+    // ------Get-----Get-----Get------Get-------Get--------Get
     // Getting all the users
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
-
-    // Adding the user to database
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      const query = { email: user.email };
-      const checkUser = await userCollection.findOne(query);
-      if (checkUser) {
-        return res.send({ message: "User Exits in database" });
-      }
-      const result = await userCollection.insertOne(user);
-      res.send(result);
-    });
-
     // checking if the user is admin or not
-    app.get('/users/admin/:email', verifyToken, async (req, res) => {
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      if(req.decoded?.user?.email !== email){
-         res.send({admin: false});
+      if (req.decoded?.user?.email !== email) {
+        res.send({ admin: false });
       }
-      const query = {email: email};
+      const query = { email: email };
       const user = await userCollection.findOne(query);
-      const result = {admin: user?.role === 'admin'};
-      res.send(result);
-    })
-
-    // Updating users role
-    app.patch("/users/admin/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await userCollection.updateOne(query, updatedDoc);
+      const result = { admin: user?.role === "admin" };
       res.send(result);
     });
-    // Deleting user
-    app.delete("/users/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await userCollection.deleteOne(query);
-      res.send(result);
-    });
-
-    // create json web token for the user
-    app.post("/get-token", async (req, res) => {
-      const user = req.body;
-      const token = jwt.sign({ user }, process.env.JWT_TOKEN, {
-        expiresIn: '5m',
-      });
-      res.send({ token });
-    });
-
     // Getting all the items from database
     app.get("/all-items", async (req, res) => {
       const result = await itemsCollection.find().toArray();
@@ -146,13 +106,69 @@ async function run() {
       const result = await cartCollection.find(query).toArray();
       res.send(result);
     });
+
+    // ------Post-----Post-----Post------Post-------Post--------Post
+    // Adding items to database
+    app.post('/add-item', verifyToken, verifyAdmin, async (req, res) => {
+      const newItem = req.body;
+      const price = parseInt(newItem?.price);
+      const result = await itemsCollection.insertOne({...newItem, price});
+      res.send(result);
+    })
+    // Adding the user to database
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const checkUser = await userCollection.findOne(query);
+      if (checkUser) {
+        return res.send({ message: "User Exits in database" });
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+    // create json web token for the user
+    app.post("/get-token", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign({ user }, process.env.JWT_TOKEN, {
+        expiresIn: "10m",
+      });
+      res.send({ token });
+    });
     // add the items to cart in database
     app.post("/add-to-cart", async (req, res) => {
       const item = req.body;
       const result = await cartCollection.insertOne(item);
       res.send(result);
     });
-    // Deleting specific Item
+    //----Patch-----Patch-----Patch------Patch-------Patch--------Patch
+    // Updating users role
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+    // ------Delete------Delete-------Delete-------Delete--------Delete
+    // Delete item bu admin
+    app.delete('/delete-item/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await itemsCollection.deleteOne(query);
+      res.send(result);
+    })
+    // Deleting user
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCollection.deleteOne(query);
+      res.send(result);
+    });
+    // Deleting specific Item from user cart
     app.delete("/delete/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: id };
