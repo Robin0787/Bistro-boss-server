@@ -5,6 +5,7 @@ const app = express();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 1000;
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_PAYMENT_KEY);
 // middleware
 app.use(cors());
 app.use(express.json());
@@ -130,7 +131,7 @@ async function run() {
     app.post("/get-token", async (req, res) => {
       const user = req.body;
       const token = jwt.sign({ user }, process.env.JWT_TOKEN, {
-        expiresIn: "10m",
+        expiresIn: "1h",
       });
       res.send({ token });
     });
@@ -139,6 +140,20 @@ async function run() {
       const item = req.body;
       const result = await cartCollection.insertOne(item);
       res.send(result);
+    });
+
+    // Create payment intent
+    app.post('/create-payment-intent', async (req, res) => {
+      const {price} = req.body;
+      const amount = parseFloat(price)*100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: "usd",
+        payment_method_types: ['card'],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      });
     });
     //----Patch-----Patch-----Patch------Patch-------Patch--------Patch
     // Updating users role
