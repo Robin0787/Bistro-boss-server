@@ -117,6 +117,60 @@ async function run() {
       const revenue = payments.reduce((sum, item) => sum + item.totalPrice ,0);
       res.send({users, products, orders, revenue});
     })
+    // Get data for charts // second system to get 
+    // ------------------------------------------------------------------------//
+    app.get('/chart-data', verifyToken, verifyAdmin, async(req, res) => {
+      const payment = await paymentCollection.find().toArray();
+      let menuItemsId = payment.map(item => item.menuItemsId);
+      menuItemsId = menuItemsId.flat(Infinity);
+      const query = {_id: {$in: menuItemsId.map((id) => new ObjectId(id))}};
+      const orderedItems = await itemsCollection.find(query).toArray();
+      // Getting all items of each categories
+      const salad = orderedItems.filter(item => item.category === 'salad');
+      const pizza = orderedItems.filter(item => item.category === 'pizza');
+      const soup = orderedItems.filter(item => item.category === 'soup');
+      const dessert = orderedItems.filter(item => item.category === 'dessert');
+      const drinks = orderedItems.filter(item => item.category === 'drinks');
+      // Getting total of all categories;
+      const saladsTotal = salad.reduce((sum, item) => sum+item.price, 0);
+      const pizzasTotal = pizza.reduce((sum, item) => sum+item.price, 0);
+      const soupsTotal = soup.reduce((sum, item) => sum+item.price, 0);
+      const dessertsTotal = dessert.reduce((sum, item) => sum+item.price, 0);
+      const drinksTotal = drinks.reduce((sum, item) => sum+item.price, 0);
+      // Making well-structured objects for client-side;
+      const saladsInfo = {category: 'salad', ordered: salad.length, totalPrice: saladsTotal.toFixed(2)};
+      const pizzasInfo = {category: 'pizza', ordered: pizza.length, totalPrice: pizzasTotal.toFixed(2)};
+      const soupsInfo = {category: 'soup', ordered: soup.length, totalPrice: soupsTotal.toFixed(2)};
+      const dessertsInfo = {category: 'dessert', ordered: dessert.length, totalPrice: dessertsTotal.toFixed(2)};
+      const drinksInfo = {category: 'drinks', ordered: drinks.length, totalPrice: drinksTotal.toFixed(2)};
+      res.send([saladsInfo, pizzasInfo, soupsInfo, dessertsInfo, drinksInfo]);
+    })
+    // ------------------------------------------------------------------------//
+    // Get data for charts the best system (aggregation)
+    // app.get('/chart-data', async (req, res) => {
+    //   const pipeline = [
+    //     {
+    //       $lookup: {
+    //         from: 'items',
+    //         localField: 'menuItemsId',
+    //         foreignField: '_id',
+    //         as: 'menuItemsData'
+    //       }
+    //     },
+    //     {
+    //       $unwind: '$menuItemsData'
+    //     },
+    //     {
+    //       $group: {
+    //         _id: '$menuItemsData.category',
+    //         count: { $sum: 1},
+    //         totalPrice: { $sum: '$menuItemsData.price'}
+    //       },
+    //     }
+    //   ];
+    //   const result = await paymentCollection.aggregate(pipeline).toArray();
+    //   res.send(result);
+    // })
     // ------Post-----Post-----Post------Post-------Post--------Post
     // Adding items to database
     app.post('/add-item', verifyToken, verifyAdmin, async (req, res) => {
