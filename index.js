@@ -108,7 +108,15 @@ async function run() {
       const result = await cartCollection.find(query).toArray();
       res.send(result);
     });
-
+    // getting the stats for admin
+    app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
+      const users = await userCollection.estimatedDocumentCount();
+      const products = await itemsCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
+      const payments = await paymentCollection.find().toArray();
+      const revenue = payments.reduce((sum, item) => sum + item.totalPrice ,0);
+      res.send({users, products, orders, revenue});
+    })
     // ------Post-----Post-----Post------Post-------Post--------Post
     // Adding items to database
     app.post('/add-item', verifyToken, verifyAdmin, async (req, res) => {
@@ -145,7 +153,7 @@ async function run() {
     // Create payment intent
     app.post('/create-payment-intent', verifyToken, async(req, res) => {
       const {price} = req.body;
-      const amount = parseFloat(price)*100;
+      const amount = Math.round((price*100));
       const paymentIntent = await stripe.paymentIntents.create({
         amount,
         currency: 'usd',
@@ -196,7 +204,7 @@ async function run() {
     // Deleting specific Item from user cart
     app.delete("/delete/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: id };
+      const query = { _id: new ObjectId(id)};
       const result = await cartCollection.deleteOne(query);
       res.send(result);
     });
