@@ -5,7 +5,7 @@ const app = express();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 1000;
 require("dotenv").config();
-const stripe = require("stripe")(process.env.STRIPE_PAYMENT_KEY);
+const stripe = require("stripe")(process.env.STRIPE_PAYMENT_SECRET_KEY);
 // middleware
 app.use(cors());
 app.use(express.json());
@@ -64,6 +64,7 @@ async function run() {
     const itemsCollection = client.db("All-Foods").collection("items");
     const reviewsCollection = client.db("All-Foods").collection("reviews");
     const cartCollection = client.db("All-Foods").collection("cart");
+    const paymentCollection = client.db("All-Foods").collection("payments");
 
     // ------Get-----Get-----Get------Get-------Get--------Get
     // Getting all the users
@@ -141,20 +142,29 @@ async function run() {
       const result = await cartCollection.insertOne(item);
       res.send(result);
     });
-
     // Create payment intent
-    app.post('/create-payment-intent', async (req, res) => {
+    app.post('/create-payment-intent', verifyToken, async(req, res) => {
       const {price} = req.body;
       const amount = parseFloat(price)*100;
       const paymentIntent = await stripe.paymentIntents.create({
         amount,
-        currency: "usd",
-        payment_method_types: ['card'],
+        currency: 'usd',
+        payment_method_types: ['card']
       });
       res.send({
         clientSecret: paymentIntent.client_secret
+      })
+    })
+    // Storing the payment to the database;
+    app.post('/payments', verifyToken, async(req, res) => {
+      const {payment} = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+      const query = {_id: {$in: payment.cartItemsId.map((id) => new ObjectId(id))}};
+      const deleteResult = await cartCollection.deleteMany(query);
+      res.send({
+        insertResult, deleteResult
       });
-    });
+    })
     //----Patch-----Patch-----Patch------Patch-------Patch--------Patch
     // Updating users role
     app.patch("/users/admin/:id", async (req, res) => {
